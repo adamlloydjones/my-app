@@ -1,0 +1,52 @@
+services:
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    environment:
+      API_URL: http://backend:4000
+
+  backend:
+    build: ./backend
+    ports:
+      - "4000:4000"
+    environment:
+      DB_HOST: db
+      DB_USER: devuser
+      DB_PASS: devpass
+      DB_NAME: appdb
+      SOLR_HOST: solr
+      SOLR_CORE: appcore
+    depends_on:
+      - db
+      - solr
+
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: appdb
+      MYSQL_USER: devuser
+      MYSQL_PASSWORD: devpass
+    volumes:
+      - db_data:/var/lib/mysql
+    ports:
+      - "33067:3306"
+
+  solr:
+    image: solr:latest
+    container_name: solr
+    ports:
+      - "8983:8983"
+    volumes:
+      - solr_data:/var/solr
+    command:
+      - solr-precreate
+      - appcore
+
+volumes:
+  db_data:
+  solr_data:
