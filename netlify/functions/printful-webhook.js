@@ -53,8 +53,7 @@ exports.handler = async (event, context) => {
     }
 
     // Get the group ID for "order-shipped" group
-    // You'll need to add this to your environment variables
-    const groupId = process.env.SENDER_GROUP_ID; // e.g., "abc123"
+    const groupId = process.env.SENDER_GROUP_ID;
 
     if (!groupId) {
       console.error('SENDER_GROUP_ID not configured');
@@ -67,8 +66,56 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // Add subscriber to the "order-shipped" group with tracking data
-    const senderResponse = await fetch('https://api.sender.net/v2/subscribers', {
+    // STEP 1: First, remove user from the group (if they're in it)
+    // This ensures the automation triggers again for repeat orders
+    try {
+      await fetch(`https://api.sender.net/v2/subscribers/${encodeURIComponent(customerEmail)}/groups/${groupId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${process.env.SENDER_API_KEY}`,
+          'Accept': 'application/json'
+        }
+      });
+      console.log('User removed from group (if they were in it)');
+    } catch (removeError) {
+      // It's okay if removal fails (user might not be in group)
+      console.log('Remove from group result:', removeError.message);
+    }
+
+    // STEP 2: Update subscriber data with new order info
+    const subscriberData = {
+      email: customerEmail,
+      firstname: customerName?.split(' ')[0] || '',
+      lastname: customerName?.split(' ').slice(1).join(' ') || '',
+      fields: {
+        order_number: orderNumber,
+        tracking_number: trackingNumber,
+        tracking_url: trackingUrl,
+        carrier: carrier,
+        items_shipped: itemsList,
+        items_count: itemsCount.toString(),
+        last_shipment_date: new Date().toISOString()
+      }
+    };
+
+    // Try to create or update the subscriber first
+    const updateResponse = await fetch('https://api.sender.net/v2/subscribers', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.SENDER_API_KEY}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(subscriberData)
+    });
+
+    if (!updateResponse.ok && updateResponse.status !== 409) {
+      const errorText = await updateResponse.text();
+      console.error('Failed to create/update subscriber:', errorText);
+    }
+
+    // STEP 3: Add user back to the group (this triggers the automation)
+    const addToGroupResponse = await fetch(`https://api.sender.net/v2/subscribers/${encodeURIComponent(customerEmail)}/groups`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${process.env.SENDER_API_KEY}`,
@@ -76,66 +123,18 @@ exports.handler = async (event, context) => {
         'Accept': 'application/json'
       },
       body: JSON.stringify({
-        email: customerEmail,
-        firstname: customerName?.split(' ')[0] || '',
-        lastname: customerName?.split(' ').slice(1).join(' ') || '',
-        groups: [groupId], // Add to the "order-shipped" group
-        fields: {
-          order_number: orderNumber,
-          tracking_number: trackingNumber,
-          tracking_url: trackingUrl,
-          carrier: carrier,
-          items_shipped: itemsList,
-          items_count: itemsCount.toString()
-        },
-        trigger_automation: true // This will trigger the automation immediately
+        groups: [groupId]
       })
     });
 
-    if (!senderResponse.ok) {
-      const errorText = await senderResponse.text();
-      console.error('Sender API error:', senderResponse.status, errorText);
-      
-      // If subscriber already exists (409), try to update them
-      if (senderResponse.status === 409) {
-        console.log('Subscriber exists, updating...');
-        
-        // Update existing subscriber and add to group
-        const updateResponse = await fetch(`https://api.sender.net/v2/subscribers`, {
-          method: 'PATCH',
-          headers: {
-            'Authorization': `Bearer ${process.env.SENDER_API_KEY}`,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify({
-            email: customerEmail,
-            groups: [groupId],
-            fields: {
-              order_number: orderNumber,
-              tracking_number: trackingNumber,
-              tracking_url: trackingUrl,
-              carrier: carrier,
-              items_shipped: itemsList,
-              items_count: itemsCount.toString()
-            }
-          })
-        });
-
-        if (!updateResponse.ok) {
-          const updateError = await updateResponse.text();
-          throw new Error(`Failed to update subscriber: ${updateResponse.status} - ${updateError}`);
-        }
-        
-        console.log('Subscriber updated and added to group');
-      } else {
-        throw new Error(`Sender API failed: ${senderResponse.status} - ${errorText}`);
-      }
-    } else {
-      console.log('Subscriber added to order-shipped group successfully');
+    if (!addToGroupResponse.ok) {
+      const errorText = await addToGroupResponse.text();
+      console.error('Failed to add to group:', errorText);
+      throw new Error(`Failed to add subscriber to group: ${addToGroupResponse.status} - ${errorText}`);
     }
 
-    const result = await senderResponse.json().catch(() => ({}));
+    console.log('Subscriber added to order-shipped group successfully');
+    const result = await addToGroupResponse.json().catch(() => ({}));
     console.log('Sender API response:', result);
 
     return {
@@ -144,7 +143,8 @@ exports.handler = async (event, context) => {
         success: true, 
         message: 'Customer added to order-shipped group, automation will trigger',
         orderId: orderNumber,
-        email: customerEmail
+        email: customerEmail,
+        itemsCount: itemsCount
       })
     };
 
