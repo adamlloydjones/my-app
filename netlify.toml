@@ -1,0 +1,31 @@
+# Netlify configuration file
+
+[build]
+  # If you have a build command (e.g., for a frontend), specify it here
+  # command = "npm run build"
+  
+  # If you have a publish directory (e.g., dist, build, public)
+  # publish = "dist"
+  
+  # Specify the functions directory
+  functions = "netlify/functions"
+
+# Function settings
+[functions]
+  # Directory where your functions are located
+  directory = "netlify/functions"
+  
+  # Set Node.js version (optional, but recommended)
+  node_bundler = "esbuild"
+
+# Optional: Set environment variables here (better to use Netlify dashboard though)
+# [context.production.environment]
+#   SENDER_API_KEY = "your-key-here"
+#   SENDER_GROUP_ID = "your-group-id-here"
+
+# Redirects and rewrites (optional)
+# Uncomment if you want a custom path for your webhook
+# [[redirects]]
+#   from = "/webhooks/printful"
+#   to = "/.netlify/functions/printful-webhook"
+#   status = 200
