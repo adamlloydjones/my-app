@@ -3,7 +3,11 @@
 [build]
   # If you have a build command (e.g., for a frontend), specify it here
   # command = "npm run build"
-  
+  command = "hugo"
+  publish = "public"
+
+[build.environment]
+  HUGO_VERSION = "0.116.0"  
   # If you have a publish directory (e.g., dist, build, public)
   # publish = "dist"
   
