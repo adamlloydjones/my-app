@@ -1,9 +1,0 @@
-# backend/Dockerfile
-FROM node:18
-
-WORKDIR /app
-COPY . .
-RUN npm install
-
-CMD ["node", "index.js"]
-EXPOSE 4000
