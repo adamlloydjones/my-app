@@ -6,7 +6,7 @@
 // Schedule this to run every hour using Netlify Scheduled Functions
 // or use a cron service like cron-job.org to trigger it
 
-const fetch = require('node-fetch');
+// const fetch = require('node-fetch');
 
 // Environment variables needed:
 // PRINTFUL_API_KEY - Your Printful API key
