@@ -18,7 +18,7 @@ exports.handler = async (event, context) => {
   console.log('🔍 Checking Printful for shipped orders...');
 
   try {
-    const printfulApiKey = process.env.PRINTFUL_API_KEY;
+    const printfulApiKey = process.env.PRINTFUL_API;
     const senderApiKey = process.env.SENDER_API_KEY;
 
     if (!printfulApiKey || !senderApiKey) {
